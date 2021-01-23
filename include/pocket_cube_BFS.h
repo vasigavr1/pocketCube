@@ -13,11 +13,7 @@
 #define MAX_SIZE 1887748
 #define ENABLE_ASSERTS 0
 
-// part that gets spinned
-#define top 0
-#define bot 1
-#define left 0
-#define right 1
+
 //degrees of spin
 #define degrees_90 0
 #define degrees_180 1
@@ -91,5 +87,25 @@ int factorial(int n) {
   return result;
 }
 
+
+//DEBUGGING FUNCTION
+void debug(const int *cubicles, const int *orientations) {
+    if (ENABLE_ASSERTS) {
+        assert(orientations[cubicles[0] - 1] < 3);//cube 0  ors 0 1 2
+        assert(((orientations[cubicles[1] - 1] == 0) || (orientations[cubicles[1] - 1] == 2) ||
+                (orientations[cubicles[1] - 1] == 4)));//cube 1 ors 0 2 4
+        assert(((orientations[cubicles[2] - 1] == 0) || (orientations[cubicles[2] - 1] == 1) ||
+                (orientations[cubicles[2] - 1] == 5)));//cube 2 ors 0 1 5
+        assert(((orientations[cubicles[3] - 1] == 0) || (orientations[cubicles[3] - 1] == 4) ||
+                (orientations[cubicles[3] - 1] == 5)));//cube 3 ors 0 4 5
+        assert(((orientations[cubicles[4] - 1] == 1) || (orientations[cubicles[4] - 1] == 2) ||
+                (orientations[cubicles[4] - 1] == 3)));//cube 4 ors 1 2 3
+        assert(((orientations[cubicles[5] - 1] == 2) || (orientations[cubicles[5] - 1] == 3) ||
+                (orientations[cubicles[5] - 1] == 4)));//cube 5 ors 2 3 4
+        assert(((orientations[cubicles[6] - 1] == 1) || (orientations[cubicles[6] - 1] == 3) ||
+                (orientations[cubicles[6] - 1] == 5)));//cube 6 ors 1 3 5
+        assert(orientations[cubicles[7] - 1] > 2);//cube 7 ors 3 4 5
+    }
+}
 
 #endif

@@ -1,4 +1,6 @@
-#include "pocket_cube_BFS.h"
+#include <pocket_cube_BFS.h>
+const int hash_height = 40320;
+const int hash_width = 6561;
 
 // 3 different ways to spin -3 different angles - 2 different sides Totally 18 different moves
 void spin(int way, int cubicles[], int orientations[], int side, int degrees) {
@@ -199,7 +201,7 @@ int hash_cubis(const int *h_cubicles) {
        cubicles[j]--; // this is tricky because now we will returned a changed cubicles array.
     }
   }
-  assert(sum_cubs < 40320);
+  assert(sum_cubs < hash_height);
   return sum_cubs;
 }
 
@@ -217,13 +219,13 @@ int hash_orients(const int *orientations) {
 }
 
 // Given the hashing code generate the instance of the cubicles and their orientations
-reverse_hash(int cubicles[], int orientations[], int code) {
+void reverse_hash(int cubicles[], int orientations[], int code) {
   int sum_cubs, sum_ors, i, j, k, l, m, pos;
   int n = cubicles_num;
   int raising_positions[7] = {-1, -1, -1, -1, -1, -1, -1};
   bool found;
-  sum_cubs = code / 6561;
-  sum_ors = code % 6561;
+  sum_cubs = code / hash_width;
+  sum_ors = code % hash_width;
   for (i = 0; i < n; i++) {
     k = n - 1 - i;
     cubicles[i] = (sum_cubs / factorials[k]) + 1;
@@ -292,7 +294,7 @@ bool move(bool **hash_table, const int *cubicles, const int *orientations, int *
         if (hash_table[row][collumn] == true) { instance_found = true; }
         symmetry++;
       }
-      //If neither the instance nor any of its symmetrics is hashed then hash and save its code for reverse hashing
+      //If neither the instance nor any of its symmetries is hashed then hash and save its code for reverse hashing
       if (instance_found == false) {
         row = hash_cubis(move_cubicles);
         collumn = hash_orients(move_orientations);
@@ -300,76 +302,53 @@ bool move(bool **hash_table, const int *cubicles, const int *orientations, int *
         hash_table[row][collumn] = true;
         hashed = true;
         (*size)++;
-        next_reverse[(*size) - 1] = row * 6561 + collumn;
+        next_reverse[(*size) - 1] = row * hash_width + collumn;
       }
     }
   }
   return hashed;
 }
 
-//DEBUGGING FUNCTION
-void debug(const int *cubicles, const int *orientations) {
-  if (ENABLE_ASSERTS) {
-    assert(orientations[cubicles[0] - 1] < 3);//cube 0  ors 0 1 2
-    assert(((orientations[cubicles[1] - 1] == 0) || (orientations[cubicles[1] - 1] == 2) ||
-            (orientations[cubicles[1] - 1] == 4)));//cube 1 ors 0 2 4
-    assert(((orientations[cubicles[2] - 1] == 0) || (orientations[cubicles[2] - 1] == 1) ||
-            (orientations[cubicles[2] - 1] == 5)));//cube 2 ors 0 1 5
-    assert(((orientations[cubicles[3] - 1] == 0) || (orientations[cubicles[3] - 1] == 4) ||
-            (orientations[cubicles[3] - 1] == 5)));//cube 3 ors 0 4 5
-    assert(((orientations[cubicles[4] - 1] == 1) || (orientations[cubicles[4] - 1] == 2) ||
-            (orientations[cubicles[4] - 1] == 3)));//cube 4 ors 1 2 3
-    assert(((orientations[cubicles[5] - 1] == 2) || (orientations[cubicles[5] - 1] == 3) ||
-            (orientations[cubicles[5] - 1] == 4)));//cube 5 ors 2 3 4
-    assert(((orientations[cubicles[6] - 1] == 1) || (orientations[cubicles[6] - 1] == 3) ||
-            (orientations[cubicles[6] - 1] == 5)));//cube 6 ors 1 3 5
-    assert(orientations[cubicles[7] - 1] > 2);//cube 7 ors 3 4 5
-  }
-}
+
 
 //initialize the hash table to all falses
 //an array dynamically allocated would actually require to save the code
-void initial(bool ***hash_table) {
+bool ** init_hash_table_and_factorials() {
   int i, k, j;
-  *hash_table = (bool **) malloc(sizeof(bool *) * 40320);
-  for (i = 0; i < 40320; i++) {
-    (*hash_table)[i] = (bool *) malloc(sizeof(bool) * 6561);
+  bool **hash_table = (bool **) malloc(sizeof(bool *) * hash_height);
+  for (i = 0; i < hash_height; i++) {
+    hash_table[i] = (bool*) calloc(sizeof(bool), hash_width);
   }
-  for (i = 0; i < 40320; i++) {
-    for (j = 0; j < 6561; j++) {
-      (*hash_table)[i][j] = false;
-    }
-  }
-  (*hash_table)[0][0] = true;
+  hash_table[0][0] = true;
 
   for (i = 0; i < cubicles_num; i++) {
     factorials[i] = factorial(i);
   }
+  return hash_table;
 }
 
 
 int factorials[cubicles_num]; // keep them memoized to avoid calculating them repeatedly
 //----------------MAIN FUNCTION----------------
 int main(void)
-//we begin hashing the initial starting position. we make 9 moves for each instance that has been
-//hashed the last move starting with 1 instance in move 0. So in every move we explore for the last
+//we begin hashing the init_hash_table_and_factorials starting position. We make 9 moves for each instance that was
+//hashed in the last move. So in every move we explore for the last
 //move's instances 9 moves thus the breadth first search. For example in move 1 we explore 1x9 instances hashing all 9
 //while in move 2 we explore 9x9=81 instances hashing only 54. The reason why an instance may not be hashed is
-//because it may be already hashed or a symmetric instance may allready be hashed. The move returns a code for every hashed
+//because it may be already hashed or a symmetric instance may already be hashed. The move returns a code for every hashed
 //instance in a way that we can perform a reverse hash extracting each instance in order to explore the 9 possible moves for it.
-//There are to reverse hash arrays one that saves the previous move's hashed instances and one that saves the current move's
-//hashed instances.For example in move 1 we save 9 instances codes in array new_reverse then we copy those instances to the array reverse
+//There are two reverse hash arrays one that saves the previous move's hashed instances and one that saves the current move's
+//hashed instances. For example in move 1 we save 9 instances codes in array new_reverse then we copy those instances to the array reverse
 //in order to feed the move function with instances and to save the codes for the 54 instances that get hashed in move 2.
 {
   int i, j, size, new_size;
   int cubicles[8] = {1, 2, 3, 4, 5, 6, 7, 8};
   int orientations[8] = {0, 0, 0, 0, 3, 3, 3, 3};
-  bool **hash_table;//[40320][6561];
   int *reverse = calloc(MAX_SIZE, sizeof(int));
   int *next_reverse = calloc(MAX_SIZE, sizeof(int));
   int moves = 0;
   bool hashed, any_hashed;
-  initial(&hash_table);
+  bool **hash_table = init_hash_table_and_factorials();
 
   size = 1;
   // perform the BFS algorithm
@@ -378,11 +357,14 @@ int main(void)
     printf("MOVE = %d \n", moves);
     any_hashed = false;
     new_size = 0;
+    printf("size = %d for move %d \n", size, moves);
     for (i = 0; i < size; i++) {
-      if (i == 0) printf("size = %d for move %d \n", size, moves);
+
       reverse_hash(cubicles, orientations, reverse[i]);
       hashed = move(hash_table, cubicles, orientations, next_reverse, &new_size);
-      if (hashed == true) { any_hashed = true; }
+
+      if (hashed == true) any_hashed = true;
+
       if (moves > 5) {
         for (j = 1; j < 8; j++) {
           if (i == ((j * size) / 8)) {
@@ -396,10 +378,11 @@ int main(void)
     size = new_size;
     //if (any_hashed == true){printf("Hashed something in the move %d\n",moves);}
   } while (any_hashed == true);
+
   printf("THE GODS NUMBER IS %d \n", moves - 1);
   int sum = 0;
-  for (i = 0; i < 40320; i++) {
-    for (j = 0; j < 6561; j++) {
+  for (i = 0; i < hash_height; i++) {
+    for (j = 0; j < hash_width; j++) {
       if (hash_table[i][j] == true) {
         sum++;
       }
