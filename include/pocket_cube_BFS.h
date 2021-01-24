@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <math.h>
+#include <stdint.h>
 
 
 #define MAX_SIZE 1887748
@@ -19,7 +20,8 @@
 #define degrees_180 1
 #define degrees_270 2
 //
-#define cubicles_num 8
+#define CUBICLES_NUM 8
+#define MAX_SYMMETRIES 24
 // spin way
 #define vertically 0
 #define sideways 1
@@ -44,7 +46,7 @@ const int left_cubes[4] = {0, 1, 4, 5}; //2
 const int bot_cubes[4] = {4, 5, 6, 7};  //3
 const int back_cubes[4] = {1, 3, 5, 7}; //4
 const int right_cubes[4] = {2, 3, 6, 7};//5
-extern int factorials[cubicles_num];
+extern int factorials[CUBICLES_NUM];
 
 
 //
@@ -89,7 +91,7 @@ int factorial(int n) {
 
 
 //DEBUGGING FUNCTION
-void debug(const int *cubicles, const int *orientations) {
+void debug(const uint8_t *cubicles, const uint8_t *orientations) {
     if (ENABLE_ASSERTS) {
         assert(orientations[cubicles[0] - 1] < 3);//cube 0  ors 0 1 2
         assert(((orientations[cubicles[1] - 1] == 0) || (orientations[cubicles[1] - 1] == 2) ||

@@ -1,9 +1,11 @@
 #include <pocket_cube_BFS.h>
+
+
 const int hash_height = 40320;
 const int hash_width = 6561;
 
 // 3 different ways to spin -3 different angles - 2 different sides Totally 18 different moves
-void spin(int way, int cubicles[], int orientations[], int side, int degrees) {
+void spin(int way, uint8_t *cubicles, uint8_t *orientations, int side, int degrees) {
 
   int temp, i, k, m;
   
@@ -88,8 +90,8 @@ void spin(int way, int cubicles[], int orientations[], int side, int degrees) {
 
 //Calculate one symmetry at a time , calculating whether the instance
 //has been already hashed under a different symmetry
-void calc_symmetries(int cubicles[], int orientations[], int symmetry) {
-  int m;
+void calc_symmetries(uint8_t *cubicles, uint8_t *orientations, int symmetry) {
+
   //6 H90
   if (symmetry == 6) {
     spin(horizontally, cubicles, orientations, 0, degrees_90);
@@ -186,11 +188,11 @@ void calc_symmetries(int cubicles[], int orientations[], int symmetry) {
 }
 
 // Hash the positions of each cubicle
-int hash_cubis(const int *h_cubicles) {
+int hash_cubis(const uint8_t *h_cubicles) {
   int i, j, sum_cubs = 0;
-  int n = cubicles_num;
-  int cubicles[cubicles_num];
-  for (i = 0; i < cubicles_num; i++) {
+  int n = CUBICLES_NUM;
+  int cubicles[CUBICLES_NUM];
+  for (i = 0; i < CUBICLES_NUM; i++) {
     cubicles[i] = h_cubicles[i];
   }
 
@@ -206,38 +208,37 @@ int hash_cubis(const int *h_cubicles) {
 }
 
 // Hash the orientation of each cubicle
-int hash_orients(const int *orientations) {
+int hash_orients(const uint8_t *orientations) {
 
-  int i, k, j, sum_ors = 0;
-  int n = cubicles_num;
+  int i, sum_ors = 0;
+  int n = CUBICLES_NUM;
   for (i = 0; i < n; i++) {
     sum_ors += (orientations[i] % 3) * (pow(3, i));
   }
-  assert(sum_ors < 6561);
+  if (ENABLE_ASSERTS) assert(sum_ors < 6561);
   return sum_ors;
 
 }
 
 // Given the hashing code generate the instance of the cubicles and their orientations
-void reverse_hash(int cubicles[], int orientations[], int code) {
+void reverse_hash(uint8_t *cubicles, uint8_t *orientations, int code) {
   int sum_cubs, sum_ors, i, j, k, l, m, pos;
-  int n = cubicles_num;
   int raising_positions[7] = {-1, -1, -1, -1, -1, -1, -1};
   bool found;
   sum_cubs = code / hash_width;
   sum_ors = code % hash_width;
-  for (i = 0; i < n; i++) {
-    k = n - 1 - i;
+  for (i = 0; i < CUBICLES_NUM; i++) {
+    k = CUBICLES_NUM - 1 - i;
     cubicles[i] = (sum_cubs / factorials[k]) + 1;
     sum_cubs = sum_cubs - ((cubicles[i] - 1) * factorials[k]);
     pos = 0;
-    for (m = 0; m < 7; m++) { raising_positions[m] = -1; }
+    for (m = 0; m < 7; m++) raising_positions[m] = -1;
     for (j = 0; j < i; j++) {
       for (l = 0; l < i; l++) {
         if (cubicles[i] >= cubicles[l]) {
           found = false;
           for (m = 0; m < 7; m++) { if (l == raising_positions[m]) { found = true; }}
-          if (found == false) {
+          if (!found) {
             cubicles[i]++;
             raising_positions[pos] = l;
             pos++;
@@ -247,10 +248,9 @@ void reverse_hash(int cubicles[], int orientations[], int code) {
     }
   }
 
-  for (i = 0; i < n; i++) {
-    k = n - 1 - i;
+  for (i = 0; i < CUBICLES_NUM; i++) {
+    k = CUBICLES_NUM - 1 - i;
     orientations[k] = (int) (sum_ors / (pow(3, k)));
-
     sum_ors = (int) (sum_ors - (orientations[k] * (pow(3, k))));
   }
 
@@ -263,46 +263,47 @@ void reverse_hash(int cubicles[], int orientations[], int code) {
 
 }
 
+// There are 24 symmetries in the cube. For every symmetry only one instance should be hashed
+// So, for every given instance we check whether it is already hashed
+// Symmetry 0 refers to the move as is
+bool is_a_symmetric_move_hashed(bool **hash_table,
+                                const uint8_t *move_cubicles,
+                                const uint8_t *move_orientations) {
+    uint8_t sym_cubicles[CUBICLES_NUM], sym_orientations[CUBICLES_NUM];
+    for (int sym_i = 0; sym_i < MAX_SYMMETRIES; ++sym_i) {
+        memcpy(sym_cubicles, move_cubicles, CUBICLES_NUM);
+        memcpy(sym_orientations, move_orientations, CUBICLES_NUM);
+        calc_symmetries(sym_cubicles, sym_orientations, sym_i);
+        uint32_t row = hash_cubis(sym_cubicles);
+        uint32_t column = hash_orients(sym_orientations);
+        if (hash_table[row][column])  {
+            return true;
+        }
+    }
+    return false;
+}
 
 //-----------------MOVE FUNCTION------------------------
-bool move(bool **hash_table, const int *cubicles, const int *orientations, int *next_reverse, int *size) {
-  int i, j, k, m, row, collumn, way, symmetry, degrees, side;
+bool move(bool **hash_table, const uint8_t *cubicles, const uint8_t *orientations, int *next_reverse, int *size) {
+  int way, degrees, side;
   int test_fact = 1;
   bool hashed = false;
-  bool instance_found = false;
-  int move_cubicles[8], move_orientations[8], sym_cubicles[8], sym_orientations[8];
-  //9 diferent kinds of moves vertical-sideways-horizontal for 90 180 and 270 degrees each
+  uint8_t move_cubicles[CUBICLES_NUM], move_orientations[CUBICLES_NUM];
+  //9 different kinds of moves vertical-sideways-horizontal for 90 180 and 270 degrees each
   for (way = 0; way <= horizontally; way++) {
     for (degrees = 0; degrees <= degrees_270; degrees++) {
-      for (i = 0; i < 8; i++) {
-        move_cubicles[i] = cubicles[i];
-        move_orientations[i] = orientations[i];
-      }
+      memcpy(move_cubicles, cubicles, CUBICLES_NUM);
+      memcpy(move_orientations, orientations, CUBICLES_NUM);
       spin(way, move_cubicles, move_orientations, 0, degrees);
-      instance_found = false;
-      symmetry = 0;
-      // There are 24 symmetries in the cube. For every symmetry only one instance should be hashed
-      // So for every given instance we check whether it is already hashed
-      while ((symmetry < 24) && (instance_found == false)) {
-        for (i = 0; i < 8; i++) {
-          sym_cubicles[i] = move_cubicles[i];
-          sym_orientations[i] = move_orientations[i];
-        }
-        calc_symmetries(sym_cubicles, sym_orientations, symmetry);
-        row = hash_cubis(sym_cubicles);
-        collumn = hash_orients(sym_orientations);
-        if (hash_table[row][collumn] == true) { instance_found = true; }
-        symmetry++;
-      }
       //If neither the instance nor any of its symmetries is hashed then hash and save its code for reverse hashing
-      if (instance_found == false) {
-        row = hash_cubis(move_cubicles);
-        collumn = hash_orients(move_orientations);
+      if (!is_a_symmetric_move_hashed(hash_table, move_cubicles, move_orientations)) {
+        int row = hash_cubis(move_cubicles);
+        int column = hash_orients(move_orientations);
         debug(move_cubicles, move_orientations);
-        hash_table[row][collumn] = true;
+        hash_table[row][column] = true;
         hashed = true;
         (*size)++;
-        next_reverse[(*size) - 1] = row * hash_width + collumn;
+        next_reverse[(*size) - 1] = row * hash_width + column;
       }
     }
   }
@@ -321,14 +322,14 @@ bool ** init_hash_table_and_factorials() {
   }
   hash_table[0][0] = true;
 
-  for (i = 0; i < cubicles_num; i++) {
+  for (i = 0; i < CUBICLES_NUM; i++) {
     factorials[i] = factorial(i);
   }
   return hash_table;
 }
 
 
-int factorials[cubicles_num]; // keep them memoized to avoid calculating them repeatedly
+int factorials[CUBICLES_NUM]; // keep them memoized to avoid calculating them repeatedly
 //----------------MAIN FUNCTION----------------
 int main(void)
 //we begin hashing the init_hash_table_and_factorials starting position. We make 9 moves for each instance that was
@@ -342,8 +343,8 @@ int main(void)
 //in order to feed the move function with instances and to save the codes for the 54 instances that get hashed in move 2.
 {
   int i, j, size, new_size;
-  int cubicles[8] = {1, 2, 3, 4, 5, 6, 7, 8};
-  int orientations[8] = {0, 0, 0, 0, 3, 3, 3, 3};
+  uint8_t cubicles[CUBICLES_NUM] = {1, 2, 3, 4, 5, 6, 7, 8};
+  uint8_t orientations[CUBICLES_NUM] = {0, 0, 0, 0, 3, 3, 3, 3};
   int *reverse = calloc(MAX_SIZE, sizeof(int));
   int *next_reverse = calloc(MAX_SIZE, sizeof(int));
   int moves = 0;
